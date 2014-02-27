@@ -4,7 +4,6 @@
 $ = jQuery
 
 $.fn.S3Uploader = (options) ->
-
   # support multiple elements
   if @length > 1
     @each ->
@@ -13,7 +12,7 @@ $.fn.S3Uploader = (options) ->
     return this
 
   $uploadForm = this
-
+  
   settings =
     path: ''
     additional_data: null
@@ -23,6 +22,7 @@ $.fn.S3Uploader = (options) ->
     progress_bar_target: null
     click_submit_target: null
     allow_multiple_files: true
+    data_type: 'json'
 
   $.extend settings, options
 
@@ -36,10 +36,11 @@ $.fn.S3Uploader = (options) ->
   setUploadForm = ->
     $uploadForm.fileupload
 
+      dataType: settings.data_type
+
       add: (e, data) ->
         file = data.files[0]
         file.unique_id = Math.random().toString(36).substr(2,16)
-
         unless settings.before_add and not settings.before_add(file)
           current_files.push data
           if $('#template-upload').length > 0
@@ -101,17 +102,10 @@ $.fn.S3Uploader = (options) ->
           name: "content-type"
           value: fileType
 
-        key = $uploadForm.data("key")
-          .replace('{timestamp}', new Date().getTime())
-          .replace('{unique_id}', @files[0].unique_id)
-          .replace('{extension}', @files[0].name.split('.').pop())
+        key = $uploadForm.data("key").replace('{timestamp}', new Date().getTime()).replace('{unique_id}', @files[0].unique_id)
 
         # substitute upload timestamp and unique_id into key
-        key_field = $.grep data, (n) ->
-          n if n.name == "key"
-
-        if key_field.length > 0
-          key_field[0].value = settings.path + key
+        data[1].value = settings.path + key
 
         # IE <= 9 doesn't have XHR2 hence it can't use formData
         # replace 'key' field to submit form
@@ -122,19 +116,18 @@ $.fn.S3Uploader = (options) ->
   build_content_object = ($uploadForm, file, result) ->
     content = {}
     if result # Use the S3 response to set the URL to avoid character encodings bugs
-      content.url            = $(result).find("Location").text()
-      content.filepath       = $('<a />').attr('href', content.url)[0].pathname
-    else # IE <= 9 retu      rn a null result object so we use the file object instead
-      domain                 = $uploadForm.attr('action')
-      content.filepath       = $uploadForm.find('input[name=key]').val().replace('/${filename}', '')
-      content.url            = domain + content.filepath + '/' + encodeURIComponent(file.name)
+      content.url      = $(result).find("Location").text()
+      content.filepath = $('<a />').attr('href', content.url)[0].pathname
+    else # IE <= 9 return a null result object so we use the file object instead
+      domain           = $uploadForm.attr('action')
+      content.filepath = $uploadForm.find('input[name=key]').val().replace('/${filename}', '')
+      content.url      = domain + content.filepath + '/' + encodeURIComponent(file.name)
 
-    content.filename         = file.name
-    content.filesize         = file.size if 'size' of file
-    content.lastModifiedDate = file.lastModifiedDate if 'lastModifiedDate' of file
-    content.filetype         = file.type if 'type' of file
-    content.unique_id        = file.unique_id if 'unique_id' of file
-    content.relativePath     = build_relativePath(file) if has_relativePath(file)
+    content.filename   = file.name
+    content.filesize   = file.size if 'size' of file
+    content.filetype   = file.type if 'type' of file
+    content.unique_id  = file.unique_id if 'unique_id' of file
+    content.relativePath = build_relativePath(file) if has_relativePath(file)
     content = $.extend content, settings.additional_data if settings.additional_data
     content
 
